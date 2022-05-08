@@ -21,6 +21,7 @@ exec(char *path, char **argv)
 
   begin_op();
 
+
   if((ip = namei(path)) == 0){
     end_op();
     cprintf("exec: fail\n");
@@ -99,6 +100,8 @@ exec(char *path, char **argv)
   curproc->sz = sz;
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
+  curproc->startTime = ticks;
+  curproc->burstTime = 0;
   switchuvm(curproc);
   freevm(oldpgdir);
   return 0;

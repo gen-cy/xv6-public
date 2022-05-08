@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="342073fe-5430-467a-9442-fce05d2c385b" name="sledge">
+        <fileTransfer accessType="SFTP" host="sledge.cs.ucr.edu" port="22" sshConfigId="b56c9b9f-4bd5-4f9f-b923-83d9e4f04a96" sshConfig="gdela010@sledge.cs.ucr.edu:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
