@@ -24,7 +24,7 @@ int main() {
         }
     }
     if(pid) {
-        for(i = 0; i < 3; i++)
+        for(i = 0; i < 3; i++) //43000*3
             wait(0);
     }
     printf(0, "parent %d done\n", getpid());

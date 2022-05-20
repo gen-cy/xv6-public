@@ -87,7 +87,7 @@ allocproc(void)
 
     found:
     p->state = EMBRYO;
-    p->prior_val = 31;
+    p->prior_val = 0;
     p->pid = nextpid++;
 
     release(&ptable.lock);
@@ -215,6 +215,8 @@ fork(void)
     pid = np->pid;
 
     acquire(&ptable.lock);
+    np->startTime = ticks;
+    np->burstTime = 0;
 
     np->state = RUNNABLE;
 
@@ -334,6 +336,53 @@ wait(int* status)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
+//void
+//scheduler(void)
+//{
+//    struct proc *p;
+//    struct cpu *c = mycpu();
+//    c->proc = 0;
+//    for(;;) {
+//        sti();
+//
+//        acquire(&ptable.lock);
+//        struct proc *lowestPriority = 0; // this should be inside the for(;;) b/c you want your highest priority process to change every time you loop over.
+//        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+//            if (p->state != RUNNABLE)
+//                continue;
+//            if (lowestPriority == 0) { //first runnable program, set it as highest priority so u can compare w/ something
+//                lowestPriority = p;
+//            }
+//            if (lowestPriority->prior_val > p->prior_val) {
+//                lowestPriority = p;
+//            }
+//        }
+//        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) { // go through each process and make them less
+//            if (p->state != RUNNABLE)
+//                continue;
+//            if (p != lowestPriority) {
+//                p->prior_val = p->prior_val - 1 % 31;
+//            }
+//        }
+//
+//        if (lowestPriority == 0) { //if there's nothing to work on, you should probably go find other stuff to do
+//            release(&ptable.lock);
+//            continue;
+//        }
+//        p = lowestPriority;
+//        c->proc = p;
+//        switchuvm(p);
+//        p->state = RUNNING;
+//        p->prior_val = p->prior_val + 1 % 31;
+//        p->burstTime++;
+//        swtch(&(c->scheduler), p->context);
+//        switchkvm();
+//        c->proc = 0;
+//        release(&ptable.lock);
+//    }
+//
+//}
+
 void
 scheduler(void)
 {
@@ -341,21 +390,14 @@ scheduler(void)
     //struct proc *j;
     struct proc *finder;
 //    struct proc *lowestPriority = 0;
-
-
     struct cpu *c = mycpu();
     c->proc = 0;
-
-
-
     for(;;) {
         // Enable interrupts on this processor.
 
-        struct proc *lowestPriority = 0; // set lowest priority to 0 every single time you are in the loop, indicating that we need a new lowestPriority
         sti();
-
         acquire(&ptable.lock);
-
+        struct proc *lowestPriority = 0; // set lowest priority to 0 every single time you are in the loop, indicating that we need a new lowestPriority
         // Loop over process table looking for process to run.
         for (finder = ptable.proc; finder < &ptable.proc[NPROC]; finder++) { //look for process to compare
             if (finder->state != RUNNABLE)
@@ -363,8 +405,12 @@ scheduler(void)
             lowestPriority = finder;
             break;
         }
+        if (lowestPriority==0) { //if lowest priority was not set, we should just pause ;D
+            release(&ptable.lock);
+            continue;
+        }
 
-        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) { // FIND PRIORITY VALUE THAT IS THE LOWEST
+        for (p = finder; p < &ptable.proc[NPROC]; p++) { // FIND PRIORITY VALUE THAT IS THE LOWEST
             if (p->state != RUNNABLE)
                 continue;
             if (lowestPriority->prior_val > p->prior_val) {
@@ -372,21 +418,32 @@ scheduler(void)
             }
         }
 
-        if (lowestPriority==0) { //if lowest priority was not set, we should just pause ;D
-            release(&ptable.lock);
-            continue;
-        }
-        p = lowestPriority; //you don't want to set the value unless lowestPriority exists
-
         //cprintf("%s %d\n", p->name, p->pid);
-        for (finder = ptable.proc; finder < &ptable.proc[NPROC]; finder++) {
-            if (finder->state != RUNNABLE)
+//        for (finder = ptable.proc; finder < &ptable.proc[NPROC]; finder++) {
+//            if (finder->state != RUNNABLE)
+//                continue;
+//            if (finder != lowestPriority) {
+//                //cprintf("Decrementing %s \n", p->name);
+//                finder->prior_val = (finder->prior_val - 1) % 31;
+//                if (finder->prior_val <= 0) {
+//                    finder->prior_val = 0;
+//                }
+//                //cprintf("after decrementing prior_val: %d \n", p->prior_val);
+//            }
+//        }
+        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) { // go through each process and make them less
+            if (p->state != RUNNABLE)
                 continue;
-            if ((finder != p)) {
-                //cprintf("Decrementing %s \n", p->name);
-                finder->prior_val = (finder->prior_val - 1) % 31;
+            if (p != lowestPriority) {
+                p->prior_val = p->prior_val - 1 % 31;
             }
+            if (p->prior_val <= 0) {
+                p->prior_val = 0;
+            }
+            //cprintf("after decrementing prior_val: %d \n", p->prior_val);
         }
+
+        p = lowestPriority; //you don't want to set the value unless lowestPriority exists
 //      cprintf("current %s prior val: %d\n", p->name, p->prior_val);
         // Switch to chosen process.  It is the process's job
         // to release ptable.lock and then reacquire it
@@ -399,19 +456,21 @@ scheduler(void)
         //cprintf("Incrementing %s to %d\n", p->name, p->prior_val+1);
         //cprintf("running %s \n", p->name);
         p->prior_val = (p->prior_val + 1) % 31;
+//        if (p->prior_val < 0) {
+//            p->prior_val = 1;
+//        }
+        //cprintf("Incrementing %d to %d\n", p->pid, p->prior_val);
         p->burstTime++;
         swtch(&(c->scheduler), p->context);
         switchkvm();
-
         // Process is done running for now.
         // It should have changed its p->state before coming back.
-
         c->proc = 0;
-
         release(&ptable.lock);
     }
 
 }
+
 
 // Enter scheduler.  Must hold only ptable.lock
 // and have changed proc->state. Saves and restores

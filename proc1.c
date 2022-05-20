@@ -3,7 +3,7 @@
 #include "user.h"
 
 int main(int arc, char*argv[]) {
-    set_prior(5);
+    set_prior(10);
     int i, k;
     printf (1, "proc1 \n");
     for(i=0; i < 43000; i++) {
